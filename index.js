@@ -35,6 +35,7 @@ redisClient
 
 //import routes
 const authRoutes = require("./routes/authRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
 
 const app = express();
 
@@ -53,6 +54,7 @@ setupSwagger(app);
 
 //define routes
 app.use("/api/auth", authRoutes);
+app.use("/api/categories", categoryRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello world PRM392");
