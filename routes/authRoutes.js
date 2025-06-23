@@ -190,4 +190,79 @@ router.post("/resend-otp", [body("email").isEmail().withMessage("Invalid email f
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login a user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: string
+ *               password:
+ *                 type: string
+ *                 example: string
+ *     responses:
+ *       200:
+ *         description: User logged in successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   example: 60d5f8c8b1b2e8a4f8c8b1b2
+ *                 fullName:
+ *                   type: string
+ *                   example: John Doe
+ *                 email:
+ *                   type: string
+ *                   example: john@example.com
+ *                 phone:
+ *                   type: string
+ *                   example: 1234567890
+ *                 token:
+ *                   type: string
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *       400:
+ *         description: Invalid credentials or email not verified
+ *         content:
+ *           text/plain:
+ *             schema:
+ *               type: string
+ *               example: Invalid email or password
+ */
+router.post(
+  "/login",
+  [
+    body("email").isEmail().withMessage("Invalid email format"),
+    body("password").notEmpty().withMessage("Password is required"),
+  ],
+  async (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).send(errors.array()[0].msg);
+    }
+    try {
+      const { email, password } = req.body;
+      const user = await authService.login(email, password);
+      res.json(user);
+    } catch (error) {
+      return res.status(400).send(error.message);
+    }
+  }
+);
+
 module.exports = router;

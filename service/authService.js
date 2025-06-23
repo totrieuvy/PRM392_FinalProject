@@ -4,6 +4,7 @@ const redis = require("redis");
 const Account = require("../models/Account");
 const fs = require("fs").promises;
 const path = require("path");
+const jwt = require("jsonwebtoken");
 
 // Initialize Redis client
 const redisClient = redis.createClient({
@@ -170,6 +171,41 @@ const authService = {
         subject: "New OTP for Your Blossom Flower Shop Account 🌷",
         html: htmlContent,
       });
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  async login(email, password) {
+    try {
+      // Find account by email
+      const account = await Account.findOne({ email });
+      if (!account) {
+        throw new Error("Invalid email or password");
+      }
+      if (!account.isActive) {
+        throw new Error("Account not verified");
+      }
+
+      // Verify password
+      const isMatch = await bcrypt.compare(password, account.password);
+      if (!isMatch) {
+        throw new Error("Invalid email or password");
+      }
+
+      // Generate JWT token
+      const token = jwt.sign({ id: account._id, role: account.role }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRES_IN || "1h",
+      });
+
+      // Return user data with token
+      return {
+        id: account._id,
+        fullName: account.fullName,
+        email: account.email,
+        phone: account.phone,
+        token,
+      };
     } catch (error) {
       throw error;
     }
