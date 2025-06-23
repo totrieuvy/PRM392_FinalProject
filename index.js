@@ -7,6 +7,7 @@ const cors = require("cors");
 require("dotenv").config();
 const setupSwagger = require("./config/swagger");
 const mongoose = require("mongoose");
+const redis = require("redis");
 
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -19,6 +20,18 @@ mongoose
   .catch((err) => {
     console.error("MongoDB connection error:", err);
   });
+
+const redisClient = redis.createClient({
+  url: process.env.REDIS_URL,
+  socket: {
+    tls: true,
+  },
+});
+
+redisClient
+  .connect()
+  .then(() => console.log("✅ Connected to Redis via Upstash"))
+  .catch(console.error);
 
 //import routes
 const authRoutes = require("./routes/authRoutes");
@@ -46,9 +59,8 @@ app.get("/", (req, res) => {
   res.send("Hello world PRM392");
 });
 
-const HOST_NAME = process.env.HOST_NAME;
 const PORT = process.env.PORT;
 
-app.listen(PORT, HOST_NAME, () => {
-  console.log(`Server is running on http://${HOST_NAME}:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });
