@@ -12,7 +12,7 @@ const swaggerOptions = {
     servers: [
       {
         // url: "http://localhost:3000",
-        url: "https://prm392-finalproject.onrender.com"
+        url: "https://prm392-finalproject.onrender.com",
         description: "Local server",
       },
     ],
