@@ -8,6 +8,7 @@ require("dotenv").config();
 const setupSwagger = require("./config/swagger");
 const mongoose = require("mongoose");
 const redis = require("redis");
+const errorHandler = require("./middlewares/errorHandler");
 
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -36,6 +37,7 @@ redisClient
 //import routes
 const authRoutes = require("./routes/authRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
+const flowerRoutes = require("./routes/flowerRoutes");
 
 const app = express();
 
@@ -55,10 +57,13 @@ setupSwagger(app);
 //define routes
 app.use("/api/auth", authRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/flowers", flowerRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello world PRM392");
 });
+
+app.use(errorHandler);
 
 const PORT = process.env.PORT;
 

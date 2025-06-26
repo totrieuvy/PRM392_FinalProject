@@ -1,4 +1,5 @@
 const Category = require("../models/Category");
+const Flower = require("../models/Flower");
 
 const categoryService = {
   async createCategory(name) {
@@ -47,6 +48,13 @@ const categoryService = {
       if (!category) {
         throw new Error("Category not found");
       }
+
+      // Check if the category is associated with any active flowers
+      const associatedFlowers = await Flower.find({ category: id, isActive: true });
+      if (associatedFlowers.length > 0) {
+        throw new Error("Cannot delete category as it is associated with active flowers");
+      }
+
       category.isActive = false;
       await category.save();
     } catch (error) {
