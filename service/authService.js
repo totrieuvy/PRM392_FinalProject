@@ -204,6 +204,7 @@ const authService = {
         fullName: account.fullName,
         email: account.email,
         phone: account.phone,
+        role: account.role,
         token,
       };
     } catch (error) {
