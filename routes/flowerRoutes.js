@@ -4,6 +4,7 @@ const Flower = require("../models/Flower");
 const Category = require("../models/Category");
 const verifyToken = require("../middlewares/verifyToken");
 const httpErrors = require("http-errors");
+const { default: mongoose } = require("mongoose");
 
 /**
  * @swagger
