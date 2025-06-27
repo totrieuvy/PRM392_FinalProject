@@ -114,6 +114,59 @@ router.get("/", async (req, res, next) => {
 
 /**
  * @swagger
+ * /api/flowers/category/{categoryId}:
+ *   get:
+ *     summary: Get all active flowers by category ID
+ *     tags: [Flowers]
+ *     parameters:
+ *       - in: path
+ *         name: categoryId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the category
+ *     responses:
+ *       200:
+ *         description: List of flowers in the specified category
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Flower'
+ *       400:
+ *         description: Invalid category ID
+ *       404:
+ *         description: Category not found or inactive
+ */
+router.get("/category/:categoryId", async (req, res, next) => {
+  try {
+    const { categoryId } = req.params;
+
+    // Validate category ID
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      return next(httpErrors.BadRequest("Invalid category ID"));
+    }
+
+    // Check if category exists and is active
+    const categoryExists = await Category.findOne({ _id: categoryId, isActive: true });
+    if (!categoryExists) {
+      return next(httpErrors.NotFound("Category not found or inactive"));
+    }
+
+    // Find active flowers in the category
+    const flowers = await Flower.find({ category: categoryId, isActive: true })
+      .populate("category", "name")
+      .populate("createBy", "fullName");
+
+    res.json(flowers);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
  * /api/flowers/{id}:
  *   get:
  *     summary: Get a flower by ID
