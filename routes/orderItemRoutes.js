@@ -67,69 +67,6 @@ const router = express.Router()
 
 /**
  * @swagger
- * /api/order-items:
- *   post:
- *     summary: Create a new order item
- *     tags: [OrderItems]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/OrderItem'
- *     responses:
- *       201:
- *         description: Order item created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   $ref: '#/components/schemas/OrderItemResponse'
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
- *       422:
- *         description: Validation error
- */
-router.post(
-    '/',
-    verifyToken,
-    [
-        body('flowerId').isMongoId().withMessage('Valid flower ID is required'),
-        body('quantity')
-            .isInt({ min: 1 })
-            .withMessage('Quantity must be at least 1'),
-        body('orderId').isMongoId().withMessage('Valid order ID is required'),
-    ],
-    handleValidationErrors,
-    async (req, res) => {
-        try {
-            const orderItem = await orderItemService.createOrderItem(req.body)
-            res.status(201).json({
-                success: true,
-                message: 'Order item created successfully',
-                data: orderItem,
-            })
-        } catch (error) {
-            res.status(400).json({
-                success: false,
-                message: error.message,
-            })
-        }
-    }
-)
-
-/**
- * @swagger
  * /api/order-items/order/{orderId}:
  *   get:
  *     summary: Get order items by order ID
@@ -254,7 +191,8 @@ router.get(
  * @swagger
  * /api/order-items/{id}:
  *   put:
- *     summary: Update order item (only if order is still pending)
+ *     summary: Update order item quantity (only if order is pending)
+ *     description: Updates the quantity of an order item and automatically adjusts stock and order total
  *     tags: [OrderItems]
  *     security:
  *       - bearerAuth: []
@@ -271,6 +209,8 @@ router.get(
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - quantity
  *             properties:
  *               quantity:
  *                 type: integer
@@ -293,7 +233,7 @@ router.get(
  *                 data:
  *                   $ref: '#/components/schemas/OrderItemResponse'
  *       400:
- *         description: Bad request
+ *         description: Bad request (insufficient stock, order not pending, etc.)
  *       401:
  *         description: Unauthorized
  *       422:
@@ -305,7 +245,6 @@ router.put(
     [
         param('id').isMongoId().withMessage('Valid order item ID is required'),
         body('quantity')
-            .optional()
             .isInt({ min: 1 })
             .withMessage('Quantity must be at least 1'),
     ],
