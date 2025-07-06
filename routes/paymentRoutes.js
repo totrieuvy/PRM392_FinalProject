@@ -175,33 +175,58 @@ router.post(
  *           type: string
  *         description: Payment amount
  *     responses:
- *       302:
- *         description: Redirect to success page
- *       default:
- *         description: Redirect to failure page on error
+ *       200:
+ *         description: Payment return processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     orderId:
+ *                       type: string
+ *                     orderCode:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     paymentCode:
+ *                       type: string
+ *                     transactionId:
+ *                       type: string
+ *       400:
+ *         description: Payment processing failed
  */
 router.get('/payment/success', async (req, res) => {
     try {
         const result = await paymentService.handlePaymentReturn(req.query)
 
-        // Redirect to success page with parameters
-        const params = new URLSearchParams({
-            orderId: result.orderId || '',
-            orderCode: result.orderCode || '',
-            status: result.status || 'PAID',
-            amount: req.query.amount || '',
-            code: req.query.code || '00',
+        // Trả về JSON response thay vì redirect
+        res.json({
+            success: true,
+            message: result.message,
+            data: {
+                orderId: result.orderId,
+                orderCode: result.orderCode,
+                status: result.status,
+                paymentCode: req.query.orderCode,
+                transactionId: req.query.id,
+            },
         })
-
-        res.redirect(`/payment-success.html?${params.toString()}`)
     } catch (error) {
-        // Redirect to failure page with error
-        const params = new URLSearchParams({
-            orderCode: req.query.orderCode || '',
-            error: error.message || 'Unknown error',
+        res.status(400).json({
+            success: false,
+            message: error.message,
+            data: {
+                orderCode: req.query.orderCode || '',
+                error: error.message || 'Payment processing failed',
+            },
         })
-
-        res.redirect(`/payment-failure.html?${params.toString()}`)
     }
 })
 
@@ -238,33 +263,56 @@ router.get('/payment/success', async (req, res) => {
  *           type: string
  *         description: Payment amount
  *     responses:
- *       302:
- *         description: Redirect to failure page
- *       default:
- *         description: Redirect to failure page on error
+ *       200:
+ *         description: Payment cancellation processed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     orderId:
+ *                       type: string
+ *                     orderCode:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     cancelled:
+ *                       type: boolean
+ *       400:
+ *         description: Payment processing failed
  */
 router.get('/payment/cancel', async (req, res) => {
     try {
         const result = await paymentService.handlePaymentReturn(req.query)
 
-        // Redirect to failure page with cancellation info
-        const params = new URLSearchParams({
-            orderId: result.orderId || '',
-            orderCode: result.orderCode || '',
-            cancel: 'true',
-            amount: req.query.amount || '',
+        // Trả về JSON response cho payment cancel
+        res.json({
+            success: false,
+            message: 'Payment was cancelled',
+            data: {
+                orderId: result.orderId,
+                orderCode: result.orderCode,
+                status: 'CANCELLED',
+                cancelled: true,
+            },
         })
-
-        res.redirect(`/payment-failure.html?${params.toString()}`)
     } catch (error) {
-        // Redirect to failure page with error
-        const params = new URLSearchParams({
-            orderCode: req.query.orderCode || '',
-            error: error.message || 'Unknown error',
-            cancel: 'true',
+        res.status(400).json({
+            success: false,
+            message: error.message,
+            data: {
+                orderCode: req.query.orderCode || '',
+                error: error.message || 'Payment processing failed',
+                cancelled: true,
+            },
         })
-
-        res.redirect(`/payment-failure.html?${params.toString()}`)
     }
 })
 

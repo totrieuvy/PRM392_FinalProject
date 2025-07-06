@@ -16,6 +16,42 @@ const router = express.Router()
  * @swagger
  * components:
  *   schemas:
+ *     OrderItem:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: Order item ID
+ *         flowerId:
+ *           type: object
+ *           properties:
+ *             _id:
+ *               type: string
+ *               description: Flower ID
+ *             name:
+ *               type: string
+ *               description: Flower name
+ *             image:
+ *               type: string
+ *               description: Flower image URL
+ *             description:
+ *               type: string
+ *               description: Flower description
+ *         actualPrice:
+ *           type: number
+ *           description: Price at the time of order
+ *         quantity:
+ *           type: integer
+ *           description: Quantity ordered
+ *       example:
+ *         _id: "60f7b1234567890123456abc"
+ *         flowerId:
+ *           _id: "60f7b1234567890123456789"
+ *           name: "Hoa Hồng Đỏ"
+ *           image: "rose.jpg"
+ *           description: "Hoa hồng đẹp"
+ *         actualPrice: 50000
+ *         quantity: 2
  *     Order:
  *       type: object
  *       required:
@@ -52,7 +88,16 @@ const router = express.Router()
  *         _id:
  *           type: string
  *         accountId:
- *           type: string
+ *           type: object
+ *           properties:
+ *             _id:
+ *               type: string
+ *             fullName:
+ *               type: string
+ *             email:
+ *               type: string
+ *             phone:
+ *               type: string
  *         items:
  *           type: array
  *           items:
@@ -65,7 +110,19 @@ const router = express.Router()
  *           type: string
  *         status:
  *           type: string
- *           enum: [pending, confirmed, shipped, delivered, cancelled]
+ *           enum: [pending, paid, confirmed, shipped, delivered, cancelled]
+ *         transactionId:
+ *           type: string
+ *           description: Associated transaction ID
+ *         paymentCode:
+ *           type: string
+ *           description: Payment code for PayOS
+ *         proofOfDelivery:
+ *           type: string
+ *           description: Proof of delivery URL/text
+ *         orderAt:
+ *           type: string
+ *           format: date-time
  *         createdAt:
  *           type: string
  *           format: date-time
