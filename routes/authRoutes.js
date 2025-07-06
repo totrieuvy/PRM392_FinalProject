@@ -1,7 +1,7 @@
-const express = require("express");
-const router = express.Router();
-const authService = require("../service/authService");
-const { body, validationResult } = require("express-validator");
+const express = require('express')
+const router = express.Router()
+const authService = require('../service/authService')
+const { body, validationResult } = require('express-validator')
 
 /**
  * @swagger
@@ -54,29 +54,31 @@ const { body, validationResult } = require("express-validator");
  *               example: Invalid email format
  */
 router.post(
-  "/register",
-  [
-    body("fullName").notEmpty().withMessage("Full name is required"),
-    body("email").isEmail().withMessage("Invalid email format"),
-    body("phone")
-      .matches(/^\d{10}$/)
-      .withMessage("Phone must be 10 digits"),
-    body("password").isLength({ min: 5 }).withMessage("Password must be at least 5 characters"),
-  ],
-  async (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).send(errors.array()[0].msg);
+    '/register',
+    [
+        body('fullName').notEmpty().withMessage('Full name is required'),
+        body('email').isEmail().withMessage('Invalid email format'),
+        body('phone')
+            .matches(/^\d{10}$/)
+            .withMessage('Phone must be 10 digits'),
+        body('password')
+            .isLength({ min: 5 })
+            .withMessage('Password must be at least 5 characters'),
+    ],
+    async (req, res, next) => {
+        const errors = validationResult(req)
+        if (!errors.isEmpty()) {
+            return res.status(400).send(errors.array()[0].msg)
+        }
+        try {
+            const { fullName, email, phone, password } = req.body
+            await authService.register({ fullName, email, phone, password })
+            res.status(201).json({ message: 'Verification email sent' })
+        } catch (error) {
+            return res.status(400).send(error.message)
+        }
     }
-    try {
-      const { fullName, email, phone, password } = req.body;
-      await authService.register({ fullName, email, phone, password });
-      res.status(201).json({ message: "Verification email sent" });
-    } catch (error) {
-      return res.status(400).send(error.message);
-    }
-  }
-);
+)
 
 /**
  * @swagger
@@ -121,22 +123,25 @@ router.post(
  *               example: Invalid or expired OTP
  */
 router.post(
-  "/verify-otp",
-  [body("email").isEmail().withMessage("Invalid email format"), body("otp").notEmpty().withMessage("OTP is required")],
-  async (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).send(errors.array()[0].msg);
+    '/verify-otp',
+    [
+        body('email').isEmail().withMessage('Invalid email format'),
+        body('otp').notEmpty().withMessage('OTP is required'),
+    ],
+    async (req, res, next) => {
+        const errors = validationResult(req)
+        if (!errors.isEmpty()) {
+            return res.status(400).send(errors.array()[0].msg)
+        }
+        try {
+            const { email, otp } = req.body
+            await authService.verifyOtp(email, otp)
+            res.json({ message: 'Account verified successfully' })
+        } catch (error) {
+            return res.status(400).send(error.message)
+        }
     }
-    try {
-      const { email, otp } = req.body;
-      await authService.verifyOtp(email, otp);
-      res.json({ message: "Account verified successfully" });
-    } catch (error) {
-      return res.status(400).send(error.message);
-    }
-  }
-);
+)
 
 /**
  * @swagger
@@ -176,19 +181,23 @@ router.post(
  *               type: string
  *               example: Account not found
  */
-router.post("/resend-otp", [body("email").isEmail().withMessage("Invalid email format")], async (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).send(errors.array()[0].msg);
-  }
-  try {
-    const { email } = req.body;
-    await authService.resendOtp(email);
-    res.json({ message: "New OTP sent" });
-  } catch (error) {
-    return res.status(400).send(error.message);
-  }
-});
+router.post(
+    '/resend-otp',
+    [body('email').isEmail().withMessage('Invalid email format')],
+    async (req, res, next) => {
+        const errors = validationResult(req)
+        if (!errors.isEmpty()) {
+            return res.status(400).send(errors.array()[0].msg)
+        }
+        try {
+            const { email } = req.body
+            await authService.resendOtp(email)
+            res.json({ message: 'New OTP sent' })
+        } catch (error) {
+            return res.status(400).send(error.message)
+        }
+    }
+)
 
 /**
  * @swagger
@@ -245,24 +254,24 @@ router.post("/resend-otp", [body("email").isEmail().withMessage("Invalid email f
  *               example: Invalid email or password
  */
 router.post(
-  "/login",
-  [
-    body("email").isEmail().withMessage("Invalid email format"),
-    body("password").notEmpty().withMessage("Password is required"),
-  ],
-  async (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).send(errors.array()[0].msg);
+    '/login',
+    [
+        body('email').isEmail().withMessage('Invalid email format'),
+        body('password').notEmpty().withMessage('Password is required'),
+    ],
+    async (req, res, next) => {
+        const errors = validationResult(req)
+        if (!errors.isEmpty()) {
+            return res.status(400).send(errors.array()[0].msg)
+        }
+        try {
+            const { email, password } = req.body
+            const user = await authService.login(email, password)
+            res.json(user)
+        } catch (error) {
+            return res.status(400).send(error.message)
+        }
     }
-    try {
-      const { email, password } = req.body;
-      const user = await authService.login(email, password);
-      res.json(user);
-    } catch (error) {
-      return res.status(400).send(error.message);
-    }
-  }
-);
+)
 
-module.exports = router;
+module.exports = router
