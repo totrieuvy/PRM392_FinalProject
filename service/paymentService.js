@@ -93,7 +93,7 @@ class PaymentService {
 
         const transaction = new Transaction({
             fromAccount: order.accountId._id,
-            toAccount: process.env.SYSTEM_ACCOUNT_ID,
+            toAccount: process.env.SYSTEM_ACCOUNT_ID || '68590d9b8c57b1e5a983fc16', // Fallback system account
             amount: parseFloat(order.totalAmount),
             transactionStatus: 'pending',
             transactionDate: new Date(),
