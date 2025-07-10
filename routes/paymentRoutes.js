@@ -146,87 +146,98 @@ router.post(
  * @swagger
  * /api/payments/payment/success:
  *   get:
- *     summary: Handle successful payment return from PayOS
+ *     summary: Handle successful payment return from PayOS (Mobile Deep Link)
+ *     description: Automatically redirects to mobile app deep link with payment result
  *     tags: [Payments]
  *     parameters:
  *       - in: query
  *         name: code
  *         schema:
  *           type: string
- *         description: Payment result code
+ *         description: Payment result code from PayOS
  *       - in: query
  *         name: id
  *         schema:
  *           type: string
- *         description: Payment ID
+ *         description: Transaction ID from PayOS
  *       - in: query
  *         name: orderCode
  *         schema:
  *           type: string
- *         description: Order code
+ *         description: Order code from PayOS
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
- *         description: Payment status
+ *         description: Payment status from PayOS
  *       - in: query
  *         name: amount
  *         schema:
  *           type: string
- *         description: Payment amount
+ *         description: Payment amount from PayOS
  *     responses:
- *       200:
- *         description: Payment return processed successfully
- *         content:
- *           application/json:
+ *       302:
+ *         description: Redirects to mobile app deep link
+ *         headers:
+ *           Location:
+ *             description: Deep link URL (flowershop://payment/success?...)
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: object
- *                   properties:
- *                     orderId:
- *                       type: string
- *                     orderCode:
- *                       type: string
- *                     status:
- *                       type: string
- *                     paymentCode:
- *                       type: string
- *                     transactionId:
- *                       type: string
- *       400:
- *         description: Payment processing failed
+ *               type: string
+ *               example: "flowershop://payment/success?orderId=123&orderCode=456&status=PAID&success=true"
+ *       302 (Error):
+ *         description: Redirects to mobile app error deep link
+ *         headers:
+ *           Location:
+ *             description: Error deep link URL (flowershop://payment/error?...)
+ *             schema:
+ *               type: string
+ *               example: "flowershop://payment/error?error=Payment%20failed&success=false"
  */
 router.get('/payment/success', async (req, res) => {
     try {
+        console.log('📥 Payment Success Callback:', {
+            query: req.query,
+            headers: {
+                'user-agent': req.headers['user-agent'],
+                'referer': req.headers['referer']
+            },
+            timestamp: new Date().toISOString()
+        })
+        
         const result = await paymentService.handlePaymentReturn(req.query)
-
-        // Trả về JSON response thay vì redirect
-        res.json({
-            success: true,
-            message: result.message,
-            data: {
-                orderId: result.orderId,
-                orderCode: result.orderCode,
-                status: result.status,
-                paymentCode: req.query.orderCode,
-                transactionId: req.query.id,
-            },
-        })
+        
+        console.log('✅ Payment Result:', result)
+        
+        // For mobile apps, redirect to deep link with all parameters
+        const deepLinkUrl = `flowershop://payment/success?` + 
+            `orderId=${result.orderId}&` +
+            `orderCode=${result.orderCode}&` +
+            `status=${result.status}&` +
+            `paymentCode=${req.query.orderCode}&` +
+            `transactionId=${req.query.id}&` +
+            `success=true&` +
+            `message=${encodeURIComponent(result.message)}`
+        
+        console.log('🔗 Redirecting to:', deepLinkUrl)
+        
+        return res.redirect(deepLinkUrl)
     } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message,
-            data: {
-                orderCode: req.query.orderCode || '',
-                error: error.message || 'Payment processing failed',
-            },
+        console.error('❌ Payment Success Error:', {
+            error: error.message,
+            stack: error.stack,
+            query: req.query,
+            timestamp: new Date().toISOString()
         })
+        
+        // For mobile, redirect to error deep link
+        const errorDeepLink = `flowershop://payment/error?` +
+            `error=${encodeURIComponent(error.message)}&` +
+            `orderCode=${req.query.orderCode || ''}&` +
+            `success=false`
+        
+        console.log('🔗 Error redirect to:', errorDeepLink)
+        
+        return res.redirect(errorDeepLink)
     }
 })
 
@@ -234,85 +245,98 @@ router.get('/payment/success', async (req, res) => {
  * @swagger
  * /api/payments/payment/cancel:
  *   get:
- *     summary: Handle cancelled payment return from PayOS
+ *     summary: Handle cancelled payment return from PayOS (Mobile Deep Link)
+ *     description: Automatically redirects to mobile app deep link with cancellation result
  *     tags: [Payments]
  *     parameters:
  *       - in: query
  *         name: code
  *         schema:
  *           type: string
- *         description: Payment result code
+ *         description: Payment result code from PayOS
  *       - in: query
  *         name: id
  *         schema:
  *           type: string
- *         description: Payment ID
+ *         description: Transaction ID from PayOS
  *       - in: query
  *         name: orderCode
  *         schema:
  *           type: string
- *         description: Order code
+ *         description: Order code from PayOS
  *       - in: query
  *         name: cancel
  *         schema:
  *           type: string
- *         description: Cancel flag
+ *         description: Cancel flag from PayOS
  *       - in: query
  *         name: amount
  *         schema:
  *           type: string
- *         description: Payment amount
+ *         description: Payment amount from PayOS
  *     responses:
- *       200:
- *         description: Payment cancellation processed
- *         content:
- *           application/json:
+ *       302:
+ *         description: Redirects to mobile app deep link
+ *         headers:
+ *           Location:
+ *             description: Deep link URL (flowershop://payment/cancel?...)
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: object
- *                   properties:
- *                     orderId:
- *                       type: string
- *                     orderCode:
- *                       type: string
- *                     status:
- *                       type: string
- *                     cancelled:
- *                       type: boolean
- *       400:
- *         description: Payment processing failed
+ *               type: string
+ *               example: "flowershop://payment/cancel?orderId=123&orderCode=456&status=CANCELLED&cancelled=true"
+ *       302 (Error):
+ *         description: Redirects to mobile app error deep link
+ *         headers:
+ *           Location:
+ *             description: Error deep link URL (flowershop://payment/error?...)
+ *             schema:
+ *               type: string
+ *               example: "flowershop://payment/error?error=Processing%20failed&cancelled=true"
  */
 router.get('/payment/cancel', async (req, res) => {
     try {
+        console.log('📥 Payment Cancel Callback:', {
+            query: req.query,
+            headers: {
+                'user-agent': req.headers['user-agent'],
+                'referer': req.headers['referer']
+            },
+            timestamp: new Date().toISOString()
+        })
+        
         const result = await paymentService.handlePaymentReturn(req.query)
 
-        // Trả về JSON response cho payment cancel
-        res.json({
-            success: false,
-            message: 'Payment was cancelled',
-            data: {
-                orderId: result.orderId,
-                orderCode: result.orderCode,
-                status: 'CANCELLED',
-                cancelled: true,
-            },
-        })
+        console.log('✅ Cancel Result:', result)
+
+        // For mobile apps, redirect to deep link with parameters
+        const deepLinkUrl = `flowershop://payment/cancel?` + 
+            `orderId=${result.orderId}&` +
+            `orderCode=${result.orderCode}&` +
+            `status=CANCELLED&` +
+            `cancelled=true&` +
+            `success=false&` +
+            `message=${encodeURIComponent('Payment was cancelled')}`
+        
+        console.log('🔗 Cancel redirect to:', deepLinkUrl)
+        
+        return res.redirect(deepLinkUrl)
     } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message,
-            data: {
-                orderCode: req.query.orderCode || '',
-                error: error.message || 'Payment processing failed',
-                cancelled: true,
-            },
+        console.error('❌ Payment Cancel Error:', {
+            error: error.message,
+            stack: error.stack,
+            query: req.query,
+            timestamp: new Date().toISOString()
         })
+        
+        // For mobile, redirect to error deep link
+        const errorDeepLink = `flowershop://payment/error?` +
+            `error=${encodeURIComponent(error.message)}&` +
+            `orderCode=${req.query.orderCode || ''}&` +
+            `cancelled=true&` +
+            `success=false`
+        
+        console.log('🔗 Error redirect to:', errorDeepLink)
+        
+        return res.redirect(errorDeepLink)
     }
 })
 
