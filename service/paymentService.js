@@ -20,10 +20,9 @@ class PaymentService {
             throw new Error('Order ID is required')
         }
 
-        const order = await Order.findById(orderId).populate(
-            'accountId',
-            'fullName email phone'
-        )
+        const order = await Order.findById(orderId)
+            .populate('accountId', 'fullName email phone')
+            .read('primary')
 
         if (!order) {
             throw new Error('Order not found')
@@ -39,10 +38,9 @@ class PaymentService {
 
         const orderCode = this.generateUniquePaymentCode()
 
-        const orderItems = await OrderItem.find({ orderId }).populate(
-            'flowerId',
-            'name price'
-        )
+        const orderItems = await OrderItem.find({ orderId })
+            .populate('flowerId', 'name price')
+            .read('primary')
 
         console.log('🔍 Order items query result:', {
             orderId,
@@ -193,6 +191,7 @@ class PaymentService {
             const order = await Order.findOne({
                 paymentCode: orderCode.toString(),
             }).populate('accountId', 'fullName email')
+            .read('primary')
 
             if (!order) {
                 throw new Error(`Order not found for payment code: ${orderCode}`)
@@ -312,7 +311,7 @@ class PaymentService {
 
             const order = await Order.findOne({
                 paymentCode: orderCode.toString(),
-            })
+            }).read('primary')
 
             if (!order) {
                 throw new Error('Order not found for payment code')
@@ -375,7 +374,7 @@ class PaymentService {
             // Update transaction status
             const order = await Order.findOne({
                 paymentCode: paymentCode.toString(),
-            })
+            }).read('primary')
 
             if (order && order.transactionId) {
                 await Transaction.findByIdAndUpdate(order.transactionId, {
