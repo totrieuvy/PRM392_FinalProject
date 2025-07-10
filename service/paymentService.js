@@ -44,15 +44,39 @@ class PaymentService {
             'name price'
         )
 
+        console.log('🔍 Order items query result:', {
+            orderId,
+            itemsFound: orderItems ? orderItems.length : 0,
+            items: orderItems
+        })
+
         if (!orderItems || orderItems.length === 0) {
-            throw new Error('No order items found')
+            throw new Error('No order items found for this order. Please ensure the order was created properly.')
         }
 
         let calculatedTotal = 0
-        const items = orderItems.map((item) => {
+        const items = orderItems.map((item, index) => {
+            console.log(`🔍 Processing item ${index}:`, {
+                item: item,
+                flowerId: item.flowerId,
+                flowerName: item.flowerId?.name,
+                actualPrice: item.actualPrice,
+                quantity: item.quantity
+            })
+
             if (!item.flowerId) {
-                throw new Error('Invalid flower data in order items')
+                throw new Error(`Invalid flower data in order item at index ${index}. Flower not found or not populated.`)
             }
+            if (!item.flowerId.name) {
+                throw new Error(`Flower name is missing for item at index ${index}`)
+            }
+            if (!item.actualPrice || isNaN(parseFloat(item.actualPrice))) {
+                throw new Error(`Invalid price for item at index ${index}: ${item.actualPrice}`)
+            }
+            if (!item.quantity || isNaN(parseInt(item.quantity))) {
+                throw new Error(`Invalid quantity for item at index ${index}: ${item.quantity}`)
+            }
+
             const itemTotal = parseFloat(item.actualPrice) * item.quantity
             calculatedTotal += itemTotal
             
