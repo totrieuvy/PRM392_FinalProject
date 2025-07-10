@@ -16,6 +16,10 @@ class PaymentService {
     async createPaymentLink(orderData) {
         const { orderId, returnUrl, cancelUrl } = orderData
 
+        if (!orderId) {
+            throw new Error('Order ID is required')
+        }
+
         const order = await Order.findById(orderId).populate(
             'accountId',
             'fullName email phone'
@@ -26,7 +30,11 @@ class PaymentService {
         }
 
         if (order.status !== 'pending') {
-            throw new Error('Order is not in pending status')
+            throw new Error(`Order is not in pending status. Current status: ${order.status}`)
+        }
+
+        if (order.paymentCode) {
+            throw new Error('Payment link already exists for this order')
         }
 
         const orderCode = this.generateUniquePaymentCode()
@@ -36,25 +44,52 @@ class PaymentService {
             'name price'
         )
 
-        const items = orderItems.map((item) => ({
-            name: item.flowerId.name,
-            quantity: item.quantity,
-            price: Math.round(parseFloat(item.actualPrice) * 100),
-        }))
+        if (!orderItems || orderItems.length === 0) {
+            throw new Error('No order items found')
+        }
 
+        let calculatedTotal = 0
+        const items = orderItems.map((item) => {
+            if (!item.flowerId) {
+                throw new Error('Invalid flower data in order items')
+            }
+            const itemTotal = parseFloat(item.actualPrice) * item.quantity
+            calculatedTotal += itemTotal
+            
+            return {
+                name: item.flowerId.name,
+                quantity: item.quantity,
+                price: Math.round(parseFloat(item.actualPrice) * 100), // Convert to cents
+            }
+        })
+
+        const orderTotal = parseFloat(order.totalAmount)
+        if (Math.abs(calculatedTotal - orderTotal) > 0.01) {
+            console.warn(`Total amount mismatch: calculated=${calculatedTotal}, order=${orderTotal}`)
+        }
+
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3000'
+        
         const paymentData = {
             orderCode: orderCode,
-            amount: Math.round(parseFloat(order.totalAmount) * 100),
+            amount: Math.round(orderTotal * 100),
             description: `#${order._id}`,
             items: items,
-            returnUrl:
-                returnUrl || `${process.env.FRONTEND_URL}/payment/success`,
-            cancelUrl:
-                cancelUrl || `${process.env.FRONTEND_URL}/payment/cancel`,
-            buyerName: order.accountId.fullName,
-            buyerEmail: order.accountId.email,
-            buyerPhone: order.accountId.phone,
+            returnUrl: returnUrl || `${baseUrl}/api/payments/payment/success`,
+            cancelUrl: cancelUrl || `${baseUrl}/api/payments/payment/cancel`,
+            buyerName: order.accountId.fullName || 'Customer',
+            buyerEmail: order.accountId.email || '',
+            buyerPhone: order.accountId.phone || '',
         }
+
+        console.log('💳 Creating payment link:', {
+            orderCode,
+            orderId,
+            amount: paymentData.amount,
+            itemCount: items.length,
+            returnUrl: paymentData.returnUrl,
+            cancelUrl: paymentData.cancelUrl
+        })
 
         const transaction = new Transaction({
             fromAccount: order.accountId._id,
@@ -76,6 +111,12 @@ class PaymentService {
                 paymentData
             )
 
+            console.log('✅ PayOS response:', {
+                paymentLinkId: paymentLinkResponse.paymentLinkId,
+                checkoutUrl: paymentLinkResponse.checkoutUrl ? 'Available' : 'Missing',
+                qrCode: paymentLinkResponse.qrCode ? 'Available' : 'Missing'
+            })
+
             return {
                 checkoutUrl: paymentLinkResponse.checkoutUrl,
                 paymentCode: orderCode,
@@ -84,11 +125,26 @@ class PaymentService {
                 amount: paymentData.amount / 100,
                 qrCode: paymentLinkResponse.qrCode,
                 paymentLinkId: paymentLinkResponse.paymentLinkId,
+                orderInfo: {
+                    customerName: order.accountId.fullName,
+                    customerEmail: order.accountId.email,
+                    itemCount: items.length,
+                    description: paymentData.description
+                }
             }
         } catch (error) {
+            console.error('❌ PayOS createPaymentLink error:', error)
+            
+            // Rollback transaction on failure
             await Transaction.findByIdAndUpdate(savedTransaction._id, {
                 transactionStatus: 'failed',
             })
+            
+            // Clear payment code from order
+            await Order.findByIdAndUpdate(orderId, {
+                $unset: { paymentCode: 1 }
+            })
+            
             throw new Error(`Payment link creation failed: ${error.message}`)
         }
     }
@@ -96,13 +152,26 @@ class PaymentService {
     async handlePaymentReturn(queryParams) {
         const { code, id, cancel, status, orderCode } = queryParams
 
+        console.log('📥 Payment return params:', {
+            code,
+            id,
+            cancel,
+            status,
+            orderCode,
+            timestamp: new Date().toISOString()
+        })
+
         try {
+            if (!orderCode) {
+                throw new Error('Order code is missing from payment return')
+            }
+
             const order = await Order.findOne({
                 paymentCode: orderCode.toString(),
-            })
+            }).populate('accountId', 'fullName email')
 
             if (!order) {
-                throw new Error('Order not found for payment code')
+                throw new Error(`Order not found for payment code: ${orderCode}`)
             }
 
             let result = {
@@ -110,13 +179,30 @@ class PaymentService {
                 message: 'Payment failed',
                 orderCode: orderCode,
                 orderId: order._id,
+                status: 'FAILED'
             }
 
+            // Handle successful payment
             if (code === '00' && status === 'PAID') {
                 const transaction = await Transaction.findById(
                     order.transactionId
                 )
-                if (transaction) {
+                
+                if (!transaction) {
+                    throw new Error('Transaction not found')
+                }
+
+                // Prevent double processing
+                if (transaction.transactionStatus === 'completed') {
+                    console.log('⚠️ Payment already processed:', orderCode)
+                    result = {
+                        success: true,
+                        message: 'Payment already completed',
+                        orderCode: orderCode,
+                        orderId: order._id,
+                        status: 'PAID',
+                    }
+                } else {
                     await Transaction.findByIdAndUpdate(transaction._id, {
                         transactionStatus: 'completed',
                     })
@@ -126,36 +212,65 @@ class PaymentService {
                         transaction._id
                     )
 
+                    console.log('✅ Payment completed successfully:', orderCode)
+                    
                     result = {
                         success: true,
-                        message: 'Payment successful',
+                        message: 'Payment completed successfully',
                         orderCode: orderCode,
                         orderId: order._id,
                         status: 'PAID',
                     }
                 }
-            } else if (cancel === 'true') {
+            } 
+            // Handle cancelled payment
+            else if (cancel === 'true' || status === 'CANCELLED') {
                 const transaction = await Transaction.findById(
                     order.transactionId
                 )
-                if (transaction) {
+                
+                if (transaction && transaction.transactionStatus !== 'cancelled') {
                     await Transaction.findByIdAndUpdate(transaction._id, {
                         transactionStatus: 'cancelled',
                     })
                 }
 
+                console.log('❌ Payment cancelled:', orderCode)
+
                 result = {
                     success: false,
-                    message: 'Payment cancelled',
+                    message: 'Payment was cancelled by user',
                     orderCode: orderCode,
                     orderId: order._id,
                     status: 'CANCELLED',
                 }
             }
+            // Handle failed payment
+            else {
+                const transaction = await Transaction.findById(
+                    order.transactionId
+                )
+                
+                if (transaction && transaction.transactionStatus === 'pending') {
+                    await Transaction.findByIdAndUpdate(transaction._id, {
+                        transactionStatus: 'failed',
+                    })
+                }
+
+                console.log('❌ Payment failed:', { code, status, orderCode })
+
+                result = {
+                    success: false,
+                    message: `Payment failed with code: ${code}`,
+                    orderCode: orderCode,
+                    orderId: order._id,
+                    status: 'FAILED',
+                }
+            }
 
             return result
         } catch (error) {
-            console.error('Payment return processing error:', error)
+            console.error('💥 Payment return processing error:', error)
             throw error
         }
     }
