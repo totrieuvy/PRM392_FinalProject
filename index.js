@@ -65,7 +65,7 @@ app.use('/api/flowers', flowerRoutes)
 app.use('/api/profile', profileRoutes)
 app.use('/api/orders', orderRoutes)
 app.use('/api/order-items', orderItemRoutes)
-app.use('/api', paymentRoutes)
+app.use('/api/payments', paymentRoutes)
 app.use('/api/transactions', transactionRoutes)
 
 app.get('/', (req, res) => {
