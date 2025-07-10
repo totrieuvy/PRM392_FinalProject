@@ -60,14 +60,14 @@ app.use(
 
 setupSwagger(app);
 
-app.use("/api/auth", authRoutes);
-app.use("/api/categories", categoryRoutes);
-app.use("/api/flowers", flowerRoutes);
-app.use("/api/profile", profileRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/order-items", orderItemRoutes);
-app.use("/api", paymentRoutes);
-app.use("/api/transactions", transactionRoutes);
+app.use('/api/auth', authRoutes)
+app.use('/api/categories', categoryRoutes)
+app.use('/api/flowers', flowerRoutes)
+app.use('/api/profile', profileRoutes)
+app.use('/api/orders', orderRoutes)
+app.use('/api/order-items', orderItemRoutes)
+app.use('/api/payments', paymentRoutes)
+app.use('/api/transactions', transactionRoutes)
 app.use("/api/accounts", accountRoutes);
 
 app.get("/", (req, res) => {

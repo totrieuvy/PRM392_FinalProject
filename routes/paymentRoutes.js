@@ -180,18 +180,18 @@ router.post(
  *         description: Redirects to mobile app deep link
  *         headers:
  *           Location:
- *             description: Deep link URL (flowershop://payment/success?...)
+ *             description: Deep link URL (myapp://payment/success?...)
  *             schema:
  *               type: string
- *               example: "flowershop://payment/success?orderId=123&orderCode=456&status=PAID&success=true"
+ *               example: "myapp://payment/success?orderId=123&orderCode=456&status=PAID&success=true"
  *       302 (Error):
  *         description: Redirects to mobile app error deep link
  *         headers:
  *           Location:
- *             description: Error deep link URL (flowershop://payment/error?...)
+ *             description: Error deep link URL (myapp://payment/error?...)
  *             schema:
  *               type: string
- *               example: "flowershop://payment/error?error=Payment%20failed&success=false"
+ *               example: "myapp://payment/error?error=Payment%20failed&success=false"
  */
 router.get('/payment/success', async (req, res) => {
     try {
@@ -209,7 +209,7 @@ router.get('/payment/success', async (req, res) => {
         console.log('✅ Payment Result:', result)
         
         // For mobile apps, redirect to deep link with all parameters
-        const deepLinkUrl = `flowershop://payment/success?` + 
+        const deepLinkUrl = `myapp://payment/success?` + 
             `orderId=${result.orderId}&` +
             `orderCode=${result.orderCode}&` +
             `status=${result.status}&` +
@@ -230,7 +230,7 @@ router.get('/payment/success', async (req, res) => {
         })
         
         // For mobile, redirect to error deep link
-        const errorDeepLink = `flowershop://payment/error?` +
+        const errorDeepLink = `myapp://payment/error?` +
             `error=${encodeURIComponent(error.message)}&` +
             `orderCode=${req.query.orderCode || ''}&` +
             `success=false`
@@ -279,18 +279,18 @@ router.get('/payment/success', async (req, res) => {
  *         description: Redirects to mobile app deep link
  *         headers:
  *           Location:
- *             description: Deep link URL (flowershop://payment/cancel?...)
+ *             description: Deep link URL (myapp://payment/cancel?...)
  *             schema:
  *               type: string
- *               example: "flowershop://payment/cancel?orderId=123&orderCode=456&status=CANCELLED&cancelled=true"
+ *               example: "myapp://payment/cancel?orderId=123&orderCode=456&status=CANCELLED&cancelled=true"
  *       302 (Error):
  *         description: Redirects to mobile app error deep link
  *         headers:
  *           Location:
- *             description: Error deep link URL (flowershop://payment/error?...)
+ *             description: Error deep link URL (myapp://payment/error?...)
  *             schema:
  *               type: string
- *               example: "flowershop://payment/error?error=Processing%20failed&cancelled=true"
+ *               example: "myapp://payment/error?error=Processing%20failed&cancelled=true"
  */
 router.get('/payment/cancel', async (req, res) => {
     try {
@@ -308,7 +308,7 @@ router.get('/payment/cancel', async (req, res) => {
         console.log('✅ Cancel Result:', result)
 
         // For mobile apps, redirect to deep link with parameters
-        const deepLinkUrl = `flowershop://payment/cancel?` + 
+        const deepLinkUrl = `myapp://payment/cancel?` + 
             `orderId=${result.orderId}&` +
             `orderCode=${result.orderCode}&` +
             `status=CANCELLED&` +
@@ -328,7 +328,7 @@ router.get('/payment/cancel', async (req, res) => {
         })
         
         // For mobile, redirect to error deep link
-        const errorDeepLink = `flowershop://payment/error?` +
+        const errorDeepLink = `myapp://payment/error?` +
             `error=${encodeURIComponent(error.message)}&` +
             `orderCode=${req.query.orderCode || ''}&` +
             `cancelled=true&` +
