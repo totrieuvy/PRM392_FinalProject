@@ -57,6 +57,16 @@ const orderSchema = new mongoose.Schema(
             sparse: true,
             trim: true,
         },
+        assignToShipper: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Account',
+            default: null,
+        },
+        certificationComplete: {
+            type: String,
+            default: null,
+            trim: true,
+        },
     },
     {
         timestamps: true,
