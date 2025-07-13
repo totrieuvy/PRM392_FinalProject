@@ -10,10 +10,10 @@ const swaggerOptions = {
       description: "API for managing flower",
     },
     servers: [
-      // {
-      //     url: "http://localhost:3000",
-      //     description: 'Local server',
-      // },
+      {
+        url: "http://localhost:3000",
+        description: "Local server",
+      },
       {
         url: "https://prm392-finalproject.onrender.com",
         description: "Production server",
