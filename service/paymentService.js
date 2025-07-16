@@ -42,25 +42,12 @@ class PaymentService {
             .populate('flowerId', 'name price')
             .read('primary')
 
-        console.log('🔍 Order items query result:', {
-            orderId,
-            itemsFound: orderItems ? orderItems.length : 0,
-            items: orderItems
-        })
-
         if (!orderItems || orderItems.length === 0) {
             throw new Error('No order items found for this order. Please ensure the order was created properly.')
         }
 
         let calculatedTotal = 0
         const items = orderItems.map((item, index) => {
-            console.log(`🔍 Processing item ${index}:`, {
-                item: item,
-                flowerId: item.flowerId,
-                flowerName: item.flowerId?.name,
-                actualPrice: item.actualPrice,
-                quantity: item.quantity
-            })
 
             if (!item.flowerId) {
                 throw new Error(`Invalid flower data in order item at index ${index}. Flower not found or not populated.`)
@@ -81,7 +68,7 @@ class PaymentService {
             return {
                 name: item.flowerId.name,
                 quantity: item.quantity,
-                price: Math.round(parseFloat(item.actualPrice) * 100), // Convert to cents
+                price: Math.round(parseFloat(item.actualPrice)),
             }
         })
 
@@ -94,7 +81,7 @@ class PaymentService {
         
         const paymentData = {
             orderCode: orderCode,
-            amount: Math.round(orderTotal * 100),
+            amount: Math.round(orderTotal),
             description: `#${order._id}`,
             items: items,
             returnUrl: returnUrl || `${baseUrl}/api/payments/payment/success`,
@@ -104,18 +91,9 @@ class PaymentService {
             buyerPhone: order.accountId.phone || '',
         }
 
-        console.log('💳 Creating payment link:', {
-            orderCode,
-            orderId,
-            amount: paymentData.amount,
-            itemCount: items.length,
-            returnUrl: paymentData.returnUrl,
-            cancelUrl: paymentData.cancelUrl
-        })
-
         const transaction = new Transaction({
             fromAccount: order.accountId._id,
-            toAccount: process.env.SYSTEM_ACCOUNT_ID || '68590d9b8c57b1e5a983fc16', // Fallback system account
+            toAccount: process.env.SYSTEM_ACCOUNT_ID || '68590d9b8c57b1e5a983fc16',
             amount: parseFloat(order.totalAmount),
             transactionStatus: 'pending',
             transactionDate: new Date(),
@@ -132,12 +110,6 @@ class PaymentService {
             const paymentLinkResponse = await this.payOS.createPaymentLink(
                 paymentData
             )
-
-            console.log('✅ PayOS response:', {
-                paymentLinkId: paymentLinkResponse.paymentLinkId,
-                checkoutUrl: paymentLinkResponse.checkoutUrl ? 'Available' : 'Missing',
-                qrCode: paymentLinkResponse.qrCode ? 'Available' : 'Missing'
-            })
 
             return {
                 checkoutUrl: paymentLinkResponse.checkoutUrl,
@@ -157,12 +129,10 @@ class PaymentService {
         } catch (error) {
             console.error('❌ PayOS createPaymentLink error:', error)
             
-            // Rollback transaction on failure
             await Transaction.findByIdAndUpdate(savedTransaction._id, {
                 transactionStatus: 'failed',
             })
             
-            // Clear payment code from order
             await Order.findByIdAndUpdate(orderId, {
                 $unset: { paymentCode: 1 }
             })
@@ -298,67 +268,29 @@ class PaymentService {
         }
     }
 
-    async handlePaymentWebhook(webhookData) {
-        try {
-            const verifyResult =
-                this.payOS.verifyPaymentWebhookData(webhookData)
-
-            if (!verifyResult) {
-                throw new Error('Invalid webhook signature')
-            }
-
-            const { orderCode, status, amount, description } = webhookData
-
-            const order = await Order.findOne({
-                paymentCode: orderCode.toString(),
-            }).read('primary')
-
-            if (!order) {
-                throw new Error('Order not found for payment code')
-            }
-
-            const transaction = await Transaction.findById(order.transactionId)
-            if (transaction) {
-                let transactionStatus = 'failed'
-
-                switch (status) {
-                    case 'PAID':
-                        transactionStatus = 'completed'
-                        await orderService.updatePaymentStatus(
-                            order._id,
-                            transaction._id
-                        )
-                        break
-                    case 'CANCELLED':
-                        transactionStatus = 'cancelled'
-                        break
-                    default:
-                        transactionStatus = 'failed'
-                }
-
-                await Transaction.findByIdAndUpdate(transaction._id, {
-                    transactionStatus,
-                })
-            }
-
-            return {
-                success: true,
-                message: 'Webhook processed successfully',
-                orderCode,
-                status: transaction.transactionStatus,
-            }
-        } catch (error) {
-            console.error('Webhook processing error:', error)
-            throw error
-        }
-    }
-
     async getPaymentLinkInfo(paymentCode) {
         try {
             const paymentInfo = await this.payOS.getPaymentLinkInformation(
                 paymentCode
             )
-            return paymentInfo
+
+            const order = await Order.findOne({
+                paymentCode: paymentCode.toString(),
+            }).populate('accountId', 'fullName email')
+            .read('primary')
+
+            return {
+                success: true,
+                message: 'Payment information retrieved successfully',
+                data: paymentInfo,
+                orderInfo: order ? {
+                    orderId: order._id,
+                    orderStatus: order.status,
+                    customerName: order.accountId?.fullName,
+                    totalAmount: order.totalAmount,
+                    orderDate: order.orderAt
+                } : null
+            }
         } catch (error) {
             throw new Error(`Failed to get payment info: ${error.message}`)
         }
@@ -371,18 +303,31 @@ class PaymentService {
                 reason
             )
 
-            // Update transaction status
             const order = await Order.findOne({
                 paymentCode: paymentCode.toString(),
             }).read('primary')
 
-            if (order && order.transactionId) {
-                await Transaction.findByIdAndUpdate(order.transactionId, {
-                    transactionStatus: 'cancelled',
+            if (order) {
+                if (order.transactionId) {
+                    await Transaction.findByIdAndUpdate(order.transactionId, {
+                        transactionStatus: 'cancelled',
+                    })
+                }
+
+                await Order.findByIdAndUpdate(order._id, {
+                    status: 'cancelled'
                 })
             }
 
-            return cancelResult
+            return {
+                success: true,
+                message: 'Payment cancelled successfully',
+                data: cancelResult,
+                orderInfo: order ? {
+                    orderId: order._id,
+                    orderStatus: 'cancelled'
+                } : null
+            }
         } catch (error) {
             throw new Error(`Failed to cancel payment: ${error.message}`)
         }
