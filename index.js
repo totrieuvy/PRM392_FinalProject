@@ -44,6 +44,7 @@ const orderItemRoutes = require("./routes/orderItemRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const transactionRoutes = require("./routes/transactionRoutes");
 const accountRoutes = require("./routes/accountRoutes");
+const shipperRoutes = require("./routes/shipperRoutes");
 
 const app = express();
 
@@ -60,15 +61,16 @@ app.use(
 
 setupSwagger(app);
 
-app.use('/api/auth', authRoutes)
-app.use('/api/categories', categoryRoutes)
-app.use('/api/flowers', flowerRoutes)
-app.use('/api/profile', profileRoutes)
-app.use('/api/orders', orderRoutes)
-app.use('/api/order-items', orderItemRoutes)
-app.use('/api/payments', paymentRoutes)
-app.use('/api/transactions', transactionRoutes)
+app.use("/api/auth", authRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/flowers", flowerRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/order-items", orderItemRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/transactions", transactionRoutes);
 app.use("/api/accounts", accountRoutes);
+app.use("/api/shippers", shipperRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello world PRM392");
