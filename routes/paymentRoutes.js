@@ -3,7 +3,10 @@ const { body, param, query, validationResult } = require('express-validator')
 const paymentService = require('../service/paymentService')
 const verifyToken = require('../middlewares/verifyToken')
 const { handleValidationErrors } = require('../utils/validations')
+const { handlePaymentCallback } = require('../utils/handlePaymentHelper')
 const router = express.Router()
+
+
 
 /**
  * @swagger
@@ -194,49 +197,7 @@ router.post(
  *               example: "myapp://payment/error?error=Payment%20failed&success=false"
  */
 router.get('/payment/success', async (req, res) => {
-    try {
-        console.log('📥 Payment Success Callback:', {
-            query: req.query,
-            headers: {
-                'user-agent': req.headers['user-agent'],
-                'referer': req.headers['referer']
-            },
-            timestamp: new Date().toISOString()
-        })
-        
-        const result = await paymentService.handlePaymentReturn(req.query)
-        
-        console.log('✅ Payment Result:', result)
-
-        const deepLinkUrl = `myapp://payment/success?` + 
-            `orderId=${result.orderId}&` +
-            `orderCode=${result.orderCode}&` +
-            `status=${result.status}&` +
-            `paymentCode=${req.query.orderCode}&` +
-            `transactionId=${req.query.id}&` +
-            `success=true&` +
-            `message=${encodeURIComponent(result.message)}`
-        
-        console.log('🔗 Redirecting to:', deepLinkUrl)
-        
-        return res.redirect(deepLinkUrl)
-    } catch (error) {
-        console.error('❌ Payment Success Error:', {
-            error: error.message,
-            stack: error.stack,
-            query: req.query,
-            timestamp: new Date().toISOString()
-        })
-        
-        const errorDeepLink = `myapp://payment/error?` +
-            `error=${encodeURIComponent(error.message)}&` +
-            `orderCode=${req.query.orderCode || ''}&` +
-            `success=false`
-        
-        console.log('🔗 Error redirect to:', errorDeepLink)
-        
-        return res.redirect(errorDeepLink)
-    }
+    return handlePaymentCallback(req, res, 'Success')
 })
 
 /**
@@ -291,64 +252,7 @@ router.get('/payment/success', async (req, res) => {
  *               example: "myapp://payment/error?error=Processing%20failed&cancelled=true"
  */
 router.get('/payment/cancel', async (req, res) => {
-    try {
-        console.log('📥 Payment Cancel Callback:', {
-            query: req.query,
-            headers: {
-                'user-agent': req.headers['user-agent'],
-                'referer': req.headers['referer']
-            },
-            timestamp: new Date().toISOString()
-        })
-        
-        const { orderCode } = req.query;
-        
-        // Tự động cập nhật order và transaction status khi user cancel trên PayOS
-        if (orderCode) {
-            try {
-                await paymentService.cancelPaymentLink(orderCode, 'User cancelled on PayOS');
-                console.log('✅ Order and transaction cancelled successfully:', orderCode);
-            } catch (cancelError) {
-                console.error('❌ Error cancelling payment:', cancelError.message);
-                // Continue with redirect even if cancel fails
-            }
-        }
-        
-        const result = await paymentService.handlePaymentReturn(req.query)
-
-        console.log('✅ Cancel Result:', result)
-
-        // For mobile apps, redirect to deep link with parameters
-        const deepLinkUrl = `myapp://payment/cancel?` + 
-            `orderId=${result.orderId}&` +
-            `orderCode=${result.orderCode}&` +
-            `status=CANCELLED&` +
-            `cancelled=true&` +
-            `success=false&` +
-            `message=${encodeURIComponent('Payment was cancelled')}`
-        
-        console.log('🔗 Cancel redirect to:', deepLinkUrl)
-        
-        return res.redirect(deepLinkUrl)
-    } catch (error) {
-        console.error('❌ Payment Cancel Error:', {
-            error: error.message,
-            stack: error.stack,
-            query: req.query,
-            timestamp: new Date().toISOString()
-        })
-        
-        // For mobile, redirect to error deep link
-        const errorDeepLink = `myapp://payment/error?` +
-            `error=${encodeURIComponent(error.message)}&` +
-            `orderCode=${req.query.orderCode || ''}&` +
-            `cancelled=true&` +
-            `success=false`
-        
-        console.log('🔗 Error redirect to:', errorDeepLink)
-        
-        return res.redirect(errorDeepLink)
-    }
+    return handlePaymentCallback(req, res, 'Cancel')
 })
 
 /**

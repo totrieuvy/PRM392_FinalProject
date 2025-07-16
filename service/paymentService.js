@@ -72,16 +72,17 @@ class PaymentService {
             }
         })
 
+        const calculatedTotalWithShipping = calculatedTotal + parseFloat(order.shippingFee || 0)
         const orderTotal = parseFloat(order.totalAmount)
-        if (Math.abs(calculatedTotal - orderTotal) > 0.01) {
-            console.warn(`Total amount mismatch: calculated=${calculatedTotal}, order=${orderTotal}`)
+        if (Math.abs(calculatedTotalWithShipping - orderTotal) > 0.01) {
+            console.warn(`Total amount mismatch: calculatedItems=${calculatedTotal}, shippingFee=${order.shippingFee}, calculatedTotal=${calculatedTotalWithShipping}, order=${orderTotal}`)
         }
 
         const baseUrl = process.env.BASE_URL || 'http://localhost:3000'
         
         const paymentData = {
             orderCode: orderCode,
-            amount: Math.round(orderTotal),
+            amount: Math.round(orderTotal), 
             description: `#${order._id}`,
             items: items,
             returnUrl: returnUrl || `${baseUrl}/api/payments/payment/success`,
@@ -116,7 +117,7 @@ class PaymentService {
                 paymentCode: orderCode,
                 transactionId: savedTransaction._id,
                 orderId: orderId,
-                amount: paymentData.amount / 100,
+                amount: paymentData.amount,
                 qrCode: paymentLinkResponse.qrCode,
                 paymentLinkId: paymentLinkResponse.paymentLinkId,
                 orderInfo: {
@@ -144,15 +145,6 @@ class PaymentService {
     async handlePaymentReturn(queryParams) {
         const { code, id, cancel, status, orderCode } = queryParams
 
-        console.log('📥 Payment return params:', {
-            code,
-            id,
-            cancel,
-            status,
-            orderCode,
-            timestamp: new Date().toISOString()
-        })
-
         try {
             if (!orderCode) {
                 throw new Error('Order code is missing from payment return')
@@ -175,19 +167,14 @@ class PaymentService {
                 status: 'FAILED'
             }
 
-            // Handle successful payment
             if (code === '00' && status === 'PAID') {
-                const transaction = await Transaction.findById(
-                    order.transactionId
-                )
+                const transaction = await Transaction.findById(order.transactionId)
                 
                 if (!transaction) {
                     throw new Error('Transaction not found')
                 }
 
-                // Prevent double processing
                 if (transaction.transactionStatus === 'completed') {
-                    console.log('⚠️ Payment already processed:', orderCode)
                     result = {
                         success: true,
                         message: 'Payment already completed',
@@ -200,12 +187,12 @@ class PaymentService {
                         transactionStatus: 'completed',
                     })
 
-                    await orderService.updatePaymentStatus(
-                        order._id,
-                        transaction._id
-                    )
+                    await Order.findByIdAndUpdate(order._id, {
+                        status: 'paid',
+                        paidAt: new Date()
+                    })
 
-                    console.log('✅ Payment completed successfully:', orderCode)
+                    await orderService.updatePaymentStatus(order._id, transaction._id)
                     
                     result = {
                         success: true,
@@ -216,11 +203,8 @@ class PaymentService {
                     }
                 }
             } 
-            // Handle cancelled payment
             else if (cancel === 'true' || status === 'CANCELLED') {
-                const transaction = await Transaction.findById(
-                    order.transactionId
-                )
+                const transaction = await Transaction.findById(order.transactionId)
                 
                 if (transaction && transaction.transactionStatus !== 'cancelled') {
                     await Transaction.findByIdAndUpdate(transaction._id, {
@@ -228,7 +212,9 @@ class PaymentService {
                     })
                 }
 
-                console.log('❌ Payment cancelled:', orderCode)
+                await Order.findByIdAndUpdate(order._id, {
+                    status: 'cancelled'
+                })
 
                 result = {
                     success: false,
@@ -238,19 +224,14 @@ class PaymentService {
                     status: 'CANCELLED',
                 }
             }
-            // Handle failed payment
             else {
-                const transaction = await Transaction.findById(
-                    order.transactionId
-                )
+                const transaction = await Transaction.findById(order.transactionId)
                 
                 if (transaction && transaction.transactionStatus === 'pending') {
                     await Transaction.findByIdAndUpdate(transaction._id, {
                         transactionStatus: 'failed',
                     })
                 }
-
-                console.log('❌ Payment failed:', { code, status, orderCode })
 
                 result = {
                     success: false,
@@ -263,7 +244,6 @@ class PaymentService {
 
             return result
         } catch (error) {
-            console.error('💥 Payment return processing error:', error)
             throw error
         }
     }
@@ -293,43 +273,6 @@ class PaymentService {
             }
         } catch (error) {
             throw new Error(`Failed to get payment info: ${error.message}`)
-        }
-    }
-
-    async cancelPaymentLink(paymentCode, reason = 'Customer request') {
-        try {
-            const cancelResult = await this.payOS.cancelPaymentLink(
-                paymentCode,
-                reason
-            )
-
-            const order = await Order.findOne({
-                paymentCode: paymentCode.toString(),
-            }).read('primary')
-
-            if (order) {
-                if (order.transactionId) {
-                    await Transaction.findByIdAndUpdate(order.transactionId, {
-                        transactionStatus: 'cancelled',
-                    })
-                }
-
-                await Order.findByIdAndUpdate(order._id, {
-                    status: 'cancelled'
-                })
-            }
-
-            return {
-                success: true,
-                message: 'Payment cancelled successfully',
-                data: cancelResult,
-                orderInfo: order ? {
-                    orderId: order._id,
-                    orderStatus: 'cancelled'
-                } : null
-            }
-        } catch (error) {
-            throw new Error(`Failed to cancel payment: ${error.message}`)
         }
     }
 
