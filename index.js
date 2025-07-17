@@ -44,6 +44,7 @@ const orderItemRoutes = require("./routes/orderItemRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const transactionRoutes = require("./routes/transactionRoutes");
 const accountRoutes = require("./routes/accountRoutes");
+const paymentTimeoutService = require("./service/paymentTimeoutService");
 const shipperRoutes = require("./routes/shipperRoutes");
 
 const app = express();
@@ -82,4 +83,7 @@ const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
+  setTimeout(() => {
+    paymentTimeoutService.startPaymentTimeoutChecker();
+  }, 2000);
 });
