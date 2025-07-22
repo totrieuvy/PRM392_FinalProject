@@ -3,7 +3,10 @@ const { body, param, query, validationResult } = require('express-validator')
 const paymentService = require('../service/paymentService')
 const verifyToken = require('../middlewares/verifyToken')
 const { handleValidationErrors } = require('../utils/validations')
+const { handlePaymentCallback } = require('../utils/handlePaymentHelper')
 const router = express.Router()
+
+
 
 /**
  * @swagger
@@ -194,51 +197,7 @@ router.post(
  *               example: "myapp://payment/error?error=Payment%20failed&success=false"
  */
 router.get('/payment/success', async (req, res) => {
-    try {
-        console.log('📥 Payment Success Callback:', {
-            query: req.query,
-            headers: {
-                'user-agent': req.headers['user-agent'],
-                'referer': req.headers['referer']
-            },
-            timestamp: new Date().toISOString()
-        })
-        
-        const result = await paymentService.handlePaymentReturn(req.query)
-        
-        console.log('✅ Payment Result:', result)
-        
-        // For mobile apps, redirect to deep link with all parameters
-        const deepLinkUrl = `myapp://payment/success?` + 
-            `orderId=${result.orderId}&` +
-            `orderCode=${result.orderCode}&` +
-            `status=${result.status}&` +
-            `paymentCode=${req.query.orderCode}&` +
-            `transactionId=${req.query.id}&` +
-            `success=true&` +
-            `message=${encodeURIComponent(result.message)}`
-        
-        console.log('🔗 Redirecting to:', deepLinkUrl)
-        
-        return res.redirect(deepLinkUrl)
-    } catch (error) {
-        console.error('❌ Payment Success Error:', {
-            error: error.message,
-            stack: error.stack,
-            query: req.query,
-            timestamp: new Date().toISOString()
-        })
-        
-        // For mobile, redirect to error deep link
-        const errorDeepLink = `myapp://payment/error?` +
-            `error=${encodeURIComponent(error.message)}&` +
-            `orderCode=${req.query.orderCode || ''}&` +
-            `success=false`
-        
-        console.log('🔗 Error redirect to:', errorDeepLink)
-        
-        return res.redirect(errorDeepLink)
-    }
+    return handlePaymentCallback(req, res, 'Success')
 })
 
 /**
@@ -293,123 +252,7 @@ router.get('/payment/success', async (req, res) => {
  *               example: "myapp://payment/error?error=Processing%20failed&cancelled=true"
  */
 router.get('/payment/cancel', async (req, res) => {
-    try {
-        console.log('📥 Payment Cancel Callback:', {
-            query: req.query,
-            headers: {
-                'user-agent': req.headers['user-agent'],
-                'referer': req.headers['referer']
-            },
-            timestamp: new Date().toISOString()
-        })
-        
-        const result = await paymentService.handlePaymentReturn(req.query)
-
-        console.log('✅ Cancel Result:', result)
-
-        // For mobile apps, redirect to deep link with parameters
-        const deepLinkUrl = `myapp://payment/cancel?` + 
-            `orderId=${result.orderId}&` +
-            `orderCode=${result.orderCode}&` +
-            `status=CANCELLED&` +
-            `cancelled=true&` +
-            `success=false&` +
-            `message=${encodeURIComponent('Payment was cancelled')}`
-        
-        console.log('🔗 Cancel redirect to:', deepLinkUrl)
-        
-        return res.redirect(deepLinkUrl)
-    } catch (error) {
-        console.error('❌ Payment Cancel Error:', {
-            error: error.message,
-            stack: error.stack,
-            query: req.query,
-            timestamp: new Date().toISOString()
-        })
-        
-        // For mobile, redirect to error deep link
-        const errorDeepLink = `myapp://payment/error?` +
-            `error=${encodeURIComponent(error.message)}&` +
-            `orderCode=${req.query.orderCode || ''}&` +
-            `cancelled=true&` +
-            `success=false`
-        
-        console.log('🔗 Error redirect to:', errorDeepLink)
-        
-        return res.redirect(errorDeepLink)
-    }
-})
-
-/**
- * @swagger
- * /api/payments/payments/webhook:
- *   post:
- *     summary: Handle PayOS webhook notifications
- *     tags: [Payments]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               orderCode:
- *                 type: string
- *                 description: Order code
- *               status:
- *                 type: string
- *                 description: Payment status
- *               amount:
- *                 type: number
- *                 description: Payment amount
- *               description:
- *                 type: string
- *                 description: Payment description
- *           example:
- *             orderCode: "123456789"
- *             status: "PAID"
- *             amount: 100000
- *             description: "Payment for Order #60f7b1234567890123456789"
- *     responses:
- *       200:
- *         description: Webhook processed successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: object
- *                   properties:
- *                     orderCode:
- *                       type: string
- *                     status:
- *                       type: string
- *       400:
- *         description: Bad request
- */
-router.post('/payments/webhook', async (req, res) => {
-    try {
-        const result = await paymentService.handlePaymentWebhook(req.body)
-        res.json({
-            success: true,
-            message: result.message,
-            data: {
-                orderCode: result.orderCode,
-                status: result.status,
-            },
-        })
-    } catch (error) {
-        console.error('Webhook error:', error)
-        res.status(400).json({
-            success: false,
-            message: error.message,
-        })
-    }
+    return handlePaymentCallback(req, res, 'Cancel')
 })
 
 /**
@@ -463,87 +306,6 @@ router.get(
                 success: true,
                 message: 'Payment information retrieved successfully',
                 data: paymentInfo,
-            })
-        } catch (error) {
-            res.status(400).json({
-                success: false,
-                message: error.message,
-            })
-        }
-    }
-)
-
-/**
- * @swagger
- * /api/payments/cancel-payment/{paymentCode}:
- *   post:
- *     summary: Cancel payment link
- *     tags: [Payments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: paymentCode
- *         required: true
- *         schema:
- *           type: string
- *         description: Payment code
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               reason:
- *                 type: string
- *                 description: Reason for cancellation (optional)
- *           example:
- *             reason: "Customer request"
- *     responses:
- *       200:
- *         description: Payment cancelled successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: object
- *                   description: Cancellation result from PayOS
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
- *       422:
- *         description: Validation error
- */
-router.post(
-    '/cancel-payment/:paymentCode',
-    verifyToken,
-    [
-        param('paymentCode').notEmpty().withMessage('Payment code is required'),
-        body('reason')
-            .optional()
-            .isString()
-            .withMessage('Reason must be a string'),
-    ],
-    handleValidationErrors,
-    async (req, res) => {
-        try {
-            const { reason } = req.body
-            const result = await paymentService.cancelPaymentLink(
-                req.params.paymentCode,
-                reason
-            )
-            res.json({
-                success: true,
-                message: 'Payment cancelled successfully',
-                data: result,
             })
         } catch (error) {
             res.status(400).json({
