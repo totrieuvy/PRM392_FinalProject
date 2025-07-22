@@ -262,11 +262,6 @@ router.put("/:id", verifyToken, async (req, res, next) => {
       return next(httpErrors.BadRequest("Stock cannot be negative"));
     }
 
-    const flower = await Flower.findOne({ _id: req.params.id, createBy: req.userId });
-    if (!flower) {
-      return next(httpErrors.NotFound("Flower not found or unauthorized"));
-    }
-
     // Update only specified fields
     flower.name = name;
     flower.price = price;
